@@ -1,0 +1,24 @@
+{
+  "name": "H. P. Lovecraft Literary Podcast Skill",
+  "skillname": "skill-hppodcraft",
+  "authorname": "JarbasSkills",
+  "foldername": "",
+  "url": "https://github.com/JarbasSkills/skill-hppodcraft",
+  "branch": "master",
+  "desktopFile": false,
+  "warning": "",
+  "systemDeps": false,
+  "platforms": [
+    "arm",
+    "arm64",
+    "i386",
+    "x86_64",
+    "ia64"
+  ],
+  "examples": [
+    "play lovecraft podcast",
+    "play lovecraft podcast episode #N",
+    "play the temple by lovecraft",
+    "play the call of cthulhu"
+  ]
+}
