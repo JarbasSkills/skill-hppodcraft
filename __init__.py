@@ -4,6 +4,7 @@ from lingua_franca.parse import extract_number
 import feedparser
 import random
 import re
+from adapt.intent import IntentBuilder
 from os.path import join, dirname
 
 
@@ -11,6 +12,7 @@ class HPPodcraftSkill(CommonPlaySkill):
 
     def __init__(self):
         super().__init__("HPPodcraft")
+        # TODO from websettings meta
         if "auth" not in self.settings:
             self.settings["auth"] = "mvbfxt71cwu0zkdwz7h5lx8et8m_bjm0"
 
@@ -25,6 +27,14 @@ class HPPodcraftSkill(CommonPlaySkill):
     def initialize(self):
         self.add_event('skill-hppodcraft.jarbasskills.home',
                        self.handle_homescreen)
+
+        # allow requesting title + audiobook outside of common play
+        # TODO move this to a fallback skill, to allow fuzzy matching
+        for r in self.readings:
+            self.register_vocabulary(r, "title")
+        self.register_intent(IntentBuilder("read_lovecraft")
+            .require("reading").require("title").optionally("lovecraft"),
+                             self.handle_reading)
 
     def get_intro_message(self):
         self.speak_dialog("intro")
@@ -57,6 +67,7 @@ class HPPodcraftSkill(CommonPlaySkill):
     def handle_homescreen(self, message):
         pass  # TODO selection menu
 
+    # common play
     def CPS_match_query_phrase(self, phrase):
         original = phrase
         match = None
@@ -138,6 +149,12 @@ class HPPodcraftSkill(CommonPlaySkill):
             data = streams["episodes"][title]
         self.audioservice.play(data["stream"])
         self.CPS_send_status(**data)
+
+    # hppodcraft
+    def handle_reading(self, message):
+        title = message.data["title"]
+        self.CPS_start(title + " audiobook",
+                       {"title": title, "reading": True})
 
     def get_streams(self):
         url = "https://www.patreon.com/rss/witchhousemmedia?auth=" + \
