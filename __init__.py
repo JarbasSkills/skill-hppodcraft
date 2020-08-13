@@ -1,10 +1,9 @@
-from mycroft.skills.common_play_skill import CommonPlaySkill, CPSMatchLevel
+from mycroft.skills.common_play_skill import CommonPlaySkill, CPSMatchLevel, CPSMatchType
 from mycroft.util.parse import match_one
 from lingua_franca.parse import extract_number
 import feedparser
 import random
 import re
-from adapt.intent import IntentBuilder
 from os.path import join, dirname
 
 
@@ -12,6 +11,9 @@ class HPPodcraftSkill(CommonPlaySkill):
 
     def __init__(self):
         super().__init__("HPPodcraft")
+        self.supported_media = [CPSMatchType.GENERIC,
+                                CPSMatchType.AUDIOBOOK,
+                                CPSMatchType.PODCAST]
         # TODO from websettings meta
         if "auth" not in self.settings:
             self.settings["auth"] = "mvbfxt71cwu0zkdwz7h5lx8et8m_bjm0"
@@ -27,14 +29,6 @@ class HPPodcraftSkill(CommonPlaySkill):
     def initialize(self):
         self.add_event('skill-hppodcraft.jarbasskills.home',
                        self.handle_homescreen)
-
-        # allow requesting title + audiobook outside of common play
-        # TODO move this to a fallback skill, to allow fuzzy matching
-        for r in self.readings:
-            self.register_vocabulary(r, "title")
-        self.register_intent(IntentBuilder("read_lovecraft")
-            .require("reading").require("title").optionally("lovecraft"),
-                             self.handle_reading)
 
     def get_intro_message(self):
         self.speak_dialog("intro")
@@ -68,34 +62,30 @@ class HPPodcraftSkill(CommonPlaySkill):
         pass  # TODO selection menu
 
     # common play
-    def CPS_match_query_phrase(self, phrase):
+    def CPS_match_query_phrase(self, phrase, media_type):
         original = phrase
         match = None
         reading = False
         title = None
         num = False
 
-        if self.voc_match(phrase, "episode") or \
-                self.voc_match(phrase, "reading"):
-            match = CPSMatchLevel.CATEGORY
-
         if self.voc_match(phrase, "lovecraft"):
             match = CPSMatchLevel.ARTIST
-            if self.voc_match(phrase, "reading"):
-                match = CPSMatchLevel.MULTI_KEY
 
-        if self.voc_match(original, "episode") and \
+        if media_type == CPSMatchType.PODCAST and \
                 self.voc_match(original, "lovecraft"):
-            # match episode number
-            num = extract_number(original.split("episode")[0], ordinals=True)
-            if num is False or num > len(self.episodes):
-                # play latest if num not requested
-                title = self.episodes[-1]
-                match = CPSMatchLevel.TITLE
-            else:
-                title = self.episodes[num - 1]
-                match = CPSMatchLevel.EXACT
-        elif self.voc_match(original, "reading") and \
+            # default to latest
+            title = self.episodes[-1]
+            match = CPSMatchLevel.TITLE
+
+            if self.voc_match(original, "episode") :
+                # match episode number
+                num = extract_number(original.split("episode")[0], ordinals=True)
+                if num is not False and num < len(self.episodes):
+                    title = self.episodes[num - 1]
+                    match = CPSMatchLevel.EXACT
+
+        elif media_type == CPSMatchType.AUDIOBOOK and \
                 self.voc_match(original, "lovecraft"):
             title = random.choice(self.readings)
             match = CPSMatchLevel.CATEGORY
@@ -105,7 +95,9 @@ class HPPodcraftSkill(CommonPlaySkill):
         name, score = match_one(phrase, self.readings)
         name2, score2 = match_one(phrase.split("episode")[0], self.episodes)
 
-        if score >= 0.5 and not self.voc_match(original, "episode"):
+        # READING / AUDIOBOOK
+        if score >= 0.5 and not self.voc_match(original, "episode") and \
+                media_type != CPSMatchType.PODCAST:
             title = name
             reading = True
             if match:
@@ -117,7 +109,9 @@ class HPPodcraftSkill(CommonPlaySkill):
                     match = CPSMatchLevel.EXACT
                 else:
                     match = CPSMatchLevel.TITLE
-        elif score2 >= 0.5 and not num:
+
+        # PODCAST
+        elif score2 >= 0.5 and not num and media_type != CPSMatchType.AUDIOBOOK:
             title = name2
             reading = False
             if match:
@@ -149,12 +143,6 @@ class HPPodcraftSkill(CommonPlaySkill):
             data = streams["episodes"][title]
         self.audioservice.play(data["stream"])
         self.CPS_send_status(**data)
-
-    # hppodcraft
-    def handle_reading(self, message):
-        title = message.data["title"]
-        self.CPS_start(title + " audiobook",
-                       {"title": title, "reading": True})
 
     def get_streams(self):
         url = "https://www.patreon.com/rss/witchhousemmedia?auth=" + \
