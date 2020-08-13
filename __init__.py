@@ -89,6 +89,7 @@ class HPPodcraftSkill(CommonPlaySkill):
                 self.voc_match(original, "lovecraft"):
             title = random.choice(self.readings)
             match = CPSMatchLevel.CATEGORY
+            reading = True
 
         phrase = self.clean_vocs(phrase)
 

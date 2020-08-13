@@ -34,6 +34,7 @@ Full story readings are also available alongside podcasts
 * "play lovecraft podcast episode #N"
 * "play the temple by lovecraft"
 * "read the call of cthulhu"
+* "read lovecraft"
 
 ## Credits 
 - JarbasAl
