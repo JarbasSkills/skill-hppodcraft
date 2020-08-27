@@ -52,7 +52,6 @@ class HPPodcraftSkill(CommonPlaySkill):
     def clean_vocs(self, phrase):
         phrase = self.remove_voc(phrase, "reading")
         phrase = self.remove_voc(phrase, "episode")
-        phrase = self.remove_voc(phrase, "lovecraft")
         phrase = self.remove_voc(phrase, "hppodcraft")
         phrase = phrase.strip()
         return phrase
@@ -88,13 +87,14 @@ class HPPodcraftSkill(CommonPlaySkill):
         elif media_type == CPSMatchType.AUDIOBOOK and \
                 self.voc_match(original, "lovecraft"):
             title = random.choice(self.readings)
-            match = CPSMatchLevel.CATEGORY
+            match = CPSMatchLevel.ARTIST
             reading = True
 
         phrase = self.clean_vocs(phrase)
 
-        name, score = match_one(phrase, self.readings)
-        name2, score2 = match_one(phrase.split("episode")[0], self.episodes)
+        query = self.remove_voc(phrase, "lovecraft")
+        name, score = match_one(query, self.readings)
+        name2, score2 = match_one(query.split("episode")[0], self.episodes)
 
         # READING / AUDIOBOOK
         if score >= 0.5 and not self.voc_match(original, "episode") and \
