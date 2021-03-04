@@ -4,13 +4,17 @@ The H.P. Lovecraft Literary Podcast has been creating podcasts and audio product
 
 Listen to the podcasts or selected readings
 
+![](./ui/logo.png)
+
 ## About 
 
-![](./ui/logo.png)
+
 
 Each week, hosts Chad Fifer and Chris Lackey discuss a piece of weird fiction.
 Talented voice actors bring the text to life. 
 Music and sound effects create atmosphere while occasional guest experts show up to make things classy.
+
+![](./gui.gif)
 
 Full story readings are also available alongside podcasts
 
