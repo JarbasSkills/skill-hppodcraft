@@ -1,59 +1,34 @@
-from mycroft.skills.common_play_skill import CommonPlaySkill, CPSMatchLevel
-from mycroft.util.parse import match_one
 from lingua_franca.parse import extract_number
 import feedparser
-import random
-import re
-from adapt.intent import IntentBuilder
+from ovos_utils.skills.templates.common_play import BetterCommonPlaySkill
+from ovos_utils.playback import CPSMatchType, CPSPlayback, CPSMatchConfidence
 from os.path import join, dirname
+from mycroft.util.parse import fuzzy_match
+from ovos_utils.json_helper import merge_dict
 
 
-class HPPodcraftSkill(CommonPlaySkill):
+class HPPodcraftSkill(BetterCommonPlaySkill):
 
     def __init__(self):
         super().__init__("HPPodcraft")
+        self.supported_media = [CPSMatchType.GENERIC,
+                                CPSMatchType.AUDIOBOOK,
+                                CPSMatchType.PODCAST]
         # TODO from websettings meta
         if "auth" not in self.settings:
             self.settings["auth"] = "mvbfxt71cwu0zkdwz7h5lx8et8m_bjm0"
 
-        self.logo = join(dirname(__file__), "ui", "logo.jpg")
-        self.bg = join(dirname(__file__), "ui", "bg2.jpg")
+        self.default_image = join(dirname(__file__), "ui", "bg2.jpg")
+        self.skill_logo = join(dirname(__file__), "ui", "logo.png")
+        self.skill_icon = join(dirname(__file__), "ui", "logo.png")
+        self.default_bg = join(dirname(__file__), "ui", "bg2.jpg")
         data = self.get_streams()
-        self.readings = list(data["readings"].keys())
-        self.readings.reverse()
-        self.episodes = list(data["episodes"].keys())
-        self.episodes.reverse()
-
-    def initialize(self):
-        self.add_event('skill-hppodcraft.jarbasskills.home',
-                       self.handle_homescreen)
-
-        # allow requesting title + audiobook outside of common play
-        # TODO move this to a fallback skill, to allow fuzzy matching
-        for r in self.readings:
-            self.register_vocabulary(r, "title")
-        self.register_intent(IntentBuilder("read_lovecraft")
-            .require("reading").require("title").optionally("lovecraft"),
-                             self.handle_reading)
+        self.readings = data["readings"]
+        self.episodes = data["episodes"]
 
     def get_intro_message(self):
         self.speak_dialog("intro")
-        self.gui.show_image(self.logo)
-
-    def remove_voc(self, utt, voc_filename, lang=None):
-        lang = lang or self.lang
-        cache_key = lang + voc_filename
-
-        if cache_key not in self.voc_match_cache:
-            self.voc_match(utt, voc_filename, lang)
-
-        if utt:
-            # Check for matches against complete words
-            for i in self.voc_match_cache[cache_key]:
-                # Substitute only whole words matching the token
-                utt = re.sub(r'\b' + i + r"\b", "", utt)
-
-        return utt
+        self.gui.show_image(self.skill_logo)
 
     def clean_vocs(self, phrase):
         phrase = self.remove_voc(phrase, "reading")
@@ -63,99 +38,101 @@ class HPPodcraftSkill(CommonPlaySkill):
         phrase = phrase.strip()
         return phrase
 
-    # homescreen
-    def handle_homescreen(self, message):
-        pass  # TODO selection menu
-
     # common play
-    def CPS_match_query_phrase(self, phrase):
-        original = phrase
-        match = None
-        reading = False
-        title = None
-        num = False
+    def CPS_search(self, phrase, media_type):
+        """Analyze phrase to see if it is a play-able phrase with this skill.
+
+        Arguments:
+            phrase (str): User phrase uttered after "Play", e.g. "some music"
+            media_type (CPSMatchType): requested CPSMatchType to search for
+
+        Returns:
+            search_results (list): list of dictionaries with result entries
+            {
+                "match_confidence": CPSMatchConfidence.HIGH,
+                "media_type":  CPSMatchType.MUSIC,
+                "uri": "https://audioservice.or.gui.will.play.this",
+                "playback": CPSPlayback.GUI,
+                "image": "http://optional.audioservice.jpg",
+                "bg_image": "http://optional.audioservice.background.jpg"
+            }
+        """
+        base_score = 0
 
         if self.voc_match(phrase, "episode") or \
                 self.voc_match(phrase, "reading"):
-            match = CPSMatchLevel.CATEGORY
+            base_score += 10
+
+        if self.voc_match(phrase, "hppodcraft"):
+            base_score += 50
+        elif media_type == CPSMatchType.GENERIC:
+            base_score = 0
 
         if self.voc_match(phrase, "lovecraft"):
-            match = CPSMatchLevel.ARTIST
-            if self.voc_match(phrase, "reading"):
-                match = CPSMatchLevel.MULTI_KEY
+            base_score += 30
+            if self.voc_match(phrase, "episode"):
+                base_score += 10
+            elif self.voc_match(phrase, "reading"):
+                base_score += 20
 
-        if self.voc_match(original, "episode") and \
-                self.voc_match(original, "lovecraft"):
-            # match episode number
-            num = extract_number(original.split("episode")[0], ordinals=True)
-            if num is False or num > len(self.episodes):
-                # play latest if num not requested
-                title = self.episodes[-1]
-                match = CPSMatchLevel.TITLE
-            else:
-                title = self.episodes[num - 1]
-                match = CPSMatchLevel.EXACT
-        elif self.voc_match(original, "reading") and \
-                self.voc_match(original, "lovecraft"):
-            title = random.choice(self.readings)
-            match = CPSMatchLevel.CATEGORY
-
+        num = extract_number(phrase, ordinals=True) or len(self.episodes)
         phrase = self.clean_vocs(phrase)
 
-        name, score = match_one(phrase, self.readings)
-        name2, score2 = match_one(phrase.split("episode")[0], self.episodes)
+        results = []
+        reading_base = episode_base = base_score
+        if media_type == CPSMatchType.AUDIOBOOK:
+            reading_base += 10
+            episode_base -= 10
+        elif media_type == CPSMatchType.PODCAST:
+            episode_base += 10
+            reading_base -= 5
 
-        if score >= 0.5 and not self.voc_match(original, "episode"):
-            title = name
-            reading = True
-            if match:
-                match = CPSMatchLevel.MULTI_KEY
-                if score >= 0.8:
-                    match = CPSMatchLevel.EXACT
-            else:
-                if score >= 0.8:
-                    match = CPSMatchLevel.EXACT
-                else:
-                    match = CPSMatchLevel.TITLE
-        elif score2 >= 0.5 and not num:
-            title = name2
-            reading = False
-            if match:
-                match = CPSMatchLevel.MULTI_KEY
-                if score2 >= 0.8:
-                    match = CPSMatchLevel.EXACT
-            else:
-                if score2 >= 0.8:
-                    match = CPSMatchLevel.EXACT
-                else:
-                    match = CPSMatchLevel.TITLE
+        if media_type != CPSMatchType.GENERIC:
+            i = len(self.episodes)
+            for k, v in self.episodes.items():
+                score = fuzzy_match(phrase, k) * 100
+                score += episode_base
+                if i == num:
+                    score += 15
+                if str(num) in k.split(" "):
+                    score += 10
+                if str(num) in k:
+                    score += 5
 
-        if title and self.voc_match(original, "hppodcraft"):
-            match = CPSMatchLevel.EXACT
+                results.append(merge_dict(v, {
+                    "match_confidence": score,
+                    "media_type": CPSMatchType.PODCAST,
+                    "uri": v["stream"],
+                    "playback": CPSPlayback.AUDIO,
+                    "image": self.default_image,
+                    "bg_image": self.default_bg,
+                    "skill_icon": self.skill_icon,
+                    "skill_logo": self.skill_logo,
+                    "author": "HPPodcraft",
+                    "album": "HPPodcraft"
+                }))
+                i -= 1
 
-        if match is not None:
-            return (phrase, match, {"reading": reading,
-                                    "title": title,
-                                    "image": self.logo,
-                                    "background": self.bg})
-        return None
+        for k, v in self.readings.items():
+            score = reading_base + fuzzy_match(phrase, k) * 100
+            if score < 45:
+                continue
+            results.append(merge_dict(v, {
+                "match_confidence": score,
+                "media_type": CPSMatchType.AUDIOBOOK,
+                "uri": v["stream"],
+                "playback": CPSPlayback.AUDIO,
+                "image": self.default_image,
+                "bg_image": self.default_bg,
+                "skill_icon": self.skill_icon,
+                "skill_logo": self.skill_logo,
+                "author": "HPPodcraft",
+                "album": "HPPodcraft"
+            }))
 
-    def CPS_start(self, phrase, data):
-        title = data["title"]
-        streams = self.get_streams()
-        if data["reading"]:
-            data = streams["readings"][title]
-        else:
-            data = streams["episodes"][title]
-        self.audioservice.play(data["stream"])
-        self.CPS_send_status(**data)
+        return results
 
     # hppodcraft
-    def handle_reading(self, message):
-        title = message.data["title"]
-        self.CPS_start(title + " audiobook",
-                       {"title": title, "reading": True})
-
     def get_streams(self):
         url = "https://www.patreon.com/rss/witchhousemmedia?auth=" + \
               self.settings["auth"]
@@ -178,7 +155,7 @@ class HPPodcraftSkill(CommonPlaySkill):
                     break
             entry = {
                 #"summary": bs4.BeautifulSoup(e["summary"], "html.parser").text,
-                "summary":e["summary"],
+                "summary": e["summary"],
                 "title": e["title"],
                 "stream": stream,
                 "date": e['published']
@@ -206,7 +183,8 @@ class HPPodcraftSkill(CommonPlaySkill):
             else:
                 other[e["title"]] = entry
 
-        return {"readings": readings, "episodes": episodes,
+        return {"readings": readings,
+                "episodes": episodes,
                 "originals": originals,
                 "commercials": commercial, "comments_show": comments_show,
                 "bonus": bonus, "other": other}
