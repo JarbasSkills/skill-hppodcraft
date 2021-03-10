@@ -65,6 +65,8 @@ class HPPodcraftSkill(BetterCommonPlaySkill):
 
         if self.voc_match(phrase, "hppodcraft"):
             base_score += 50
+        elif media_type == CPSMatchType.GENERIC:
+            base_score = 0
 
         if self.voc_match(phrase, "lovecraft"):
             base_score += 30
@@ -84,34 +86,39 @@ class HPPodcraftSkill(BetterCommonPlaySkill):
         elif media_type == CPSMatchType.PODCAST:
             episode_base += 10
             reading_base -= 5
-        i = len(self.episodes)
-        for k, v in self.episodes.items():
-            score = fuzzy_match(phrase, k) * 100
-            score += episode_base
-            if i == num:
-                score += 15
-            if str(num) in k.split(" "):
-                score += 10
-            if str(num) in k:
-                score += 5
 
-            results.append(merge_dict(v, {
-                "match_confidence": score,
-                "media_type": CPSMatchType.PODCAST,
-                "uri": v["stream"],
-                "playback": CPSPlayback.AUDIO,
-                "image": self.default_image,
-                "bg_image": self.default_bg,
-                "skill_icon": self.skill_icon,
-                "skill_logo": self.skill_logo,
-                "author": "HPPodcraft",
-                "album": "HPPodcraft"
-            }))
-            i -= 1
+        if media_type != CPSMatchType.GENERIC:
+            i = len(self.episodes)
+            for k, v in self.episodes.items():
+                score = fuzzy_match(phrase, k) * 100
+                score += episode_base
+                if i == num:
+                    score += 15
+                if str(num) in k.split(" "):
+                    score += 10
+                if str(num) in k:
+                    score += 5
+
+                results.append(merge_dict(v, {
+                    "match_confidence": score,
+                    "media_type": CPSMatchType.PODCAST,
+                    "uri": v["stream"],
+                    "playback": CPSPlayback.AUDIO,
+                    "image": self.default_image,
+                    "bg_image": self.default_bg,
+                    "skill_icon": self.skill_icon,
+                    "skill_logo": self.skill_logo,
+                    "author": "HPPodcraft",
+                    "album": "HPPodcraft"
+                }))
+                i -= 1
 
         for k, v in self.readings.items():
+            score = reading_base + fuzzy_match(phrase, k) * 100
+            if score < 45:
+                continue
             results.append(merge_dict(v, {
-                "match_confidence": reading_base + fuzzy_match(phrase, k) * 100,
+                "match_confidence": score,
                 "media_type": CPSMatchType.AUDIOBOOK,
                 "uri": v["stream"],
                 "playback": CPSPlayback.AUDIO,
@@ -148,7 +155,7 @@ class HPPodcraftSkill(BetterCommonPlaySkill):
                     break
             entry = {
                 #"summary": bs4.BeautifulSoup(e["summary"], "html.parser").text,
-                "summary":e["summary"],
+                "summary": e["summary"],
                 "title": e["title"],
                 "stream": stream,
                 "date": e['published']
