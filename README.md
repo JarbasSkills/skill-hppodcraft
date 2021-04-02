@@ -1,4 +1,4 @@
-# <img src='./res/icon/icon.png' card_color='#40DBB0' width='50' height='50' style='vertical-align:bottom'/> The H.P. Lovecraft Literary Podcast 
+# <img src='./ui/icon.png' card_color='#40DBB0' width='50' height='50' style='vertical-align:bottom'/> The H.P. Lovecraft Literary Podcast 
 
 The H.P. Lovecraft Literary Podcast has been creating podcasts and audio productions since 2009
 
