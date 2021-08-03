@@ -1,13 +1,14 @@
 from lingua_franca.parse import extract_number
 import feedparser
-from ovos_utils.skills.templates.common_play import BetterCommonPlaySkill
-from ovos_utils.playback import CPSMatchType, CPSPlayback, CPSMatchConfidence
+from ovos_workshop.skills.common_play import OVOSCommonPlaybackSkill
+from ovos_workshop.frameworks.playback import CPSMatchType, CPSPlayback, \
+    CPSMatchConfidence
 from os.path import join, dirname
 from mycroft.util.parse import fuzzy_match
 from ovos_utils.json_helper import merge_dict
 
 
-class HPPodcraftSkill(BetterCommonPlaySkill):
+class HPPodcraftSkill(OVOSCommonPlaybackSkill):
 
     def __init__(self):
         super().__init__("HPPodcraft")
