@@ -1,8 +1,8 @@
 from lingua_franca.parse import extract_number
 import feedparser
 from ovos_workshop.skills.common_play import OVOSCommonPlaybackSkill
-from ovos_workshop.frameworks.playback import CPSMatchType, CPSPlayback, \
-    CPSMatchConfidence
+from ovos_workshop.frameworks.playback import CommonPlayMediaType, CommonPlayPlaybackType, \
+    CommonPlayMatchConfidence
 from os.path import join, dirname
 from mycroft.util.parse import fuzzy_match
 from ovos_utils.json_helper import merge_dict
@@ -12,9 +12,9 @@ class HPPodcraftSkill(OVOSCommonPlaybackSkill):
 
     def __init__(self):
         super().__init__("HPPodcraft")
-        self.supported_media = [CPSMatchType.GENERIC,
-                                CPSMatchType.AUDIOBOOK,
-                                CPSMatchType.PODCAST]
+        self.supported_media = [CommonPlayMediaType.GENERIC,
+                                CommonPlayMediaType.AUDIOBOOK,
+                                CommonPlayMediaType.PODCAST]
         # TODO from websettings meta
         if "auth" not in self.settings:
             self.settings["auth"] = "mvbfxt71cwu0zkdwz7h5lx8et8m_bjm0"
@@ -45,15 +45,15 @@ class HPPodcraftSkill(OVOSCommonPlaybackSkill):
 
         Arguments:
             phrase (str): User phrase uttered after "Play", e.g. "some music"
-            media_type (CPSMatchType): requested CPSMatchType to search for
+            media_type (CommonPlayMediaType): requested CPSMatchType to search for
 
         Returns:
             search_results (list): list of dictionaries with result entries
             {
-                "match_confidence": CPSMatchConfidence.HIGH,
+                "match_confidence": CommonPlayMatchConfidence.HIGH,
                 "media_type":  CPSMatchType.MUSIC,
                 "uri": "https://audioservice.or.gui.will.play.this",
-                "playback": CPSPlayback.GUI,
+                "playback": CommonPlayPlaybackType.GUI,
                 "image": "http://optional.audioservice.jpg",
                 "bg_image": "http://optional.audioservice.background.jpg"
             }
@@ -66,7 +66,7 @@ class HPPodcraftSkill(OVOSCommonPlaybackSkill):
 
         if self.voc_match(phrase, "hppodcraft"):
             base_score += 50
-        elif media_type == CPSMatchType.GENERIC:
+        elif media_type == CommonPlayMediaType.GENERIC:
             base_score = 0
 
         if self.voc_match(phrase, "lovecraft"):
@@ -81,14 +81,14 @@ class HPPodcraftSkill(OVOSCommonPlaybackSkill):
 
         results = []
         reading_base = episode_base = base_score
-        if media_type == CPSMatchType.AUDIOBOOK:
+        if media_type == CommonPlayMediaType.AUDIOBOOK:
             reading_base += 10
             episode_base -= 10
-        elif media_type == CPSMatchType.PODCAST:
+        elif media_type == CommonPlayMediaType.PODCAST:
             episode_base += 10
             reading_base -= 5
 
-        if media_type != CPSMatchType.GENERIC:
+        if media_type != CommonPlayMediaType.GENERIC:
             i = len(self.episodes)
             for k, v in self.episodes.items():
                 score = fuzzy_match(phrase, k) * 100
@@ -102,9 +102,9 @@ class HPPodcraftSkill(OVOSCommonPlaybackSkill):
 
                 results.append(merge_dict(v, {
                     "match_confidence": score,
-                    "media_type": CPSMatchType.PODCAST,
+                    "media_type": CommonPlayMediaType.PODCAST,
                     "uri": v["stream"],
-                    "playback": CPSPlayback.AUDIO,
+                    "playback": CommonPlayPlaybackType.AUDIO,
                     "image": self.default_image,
                     "bg_image": self.default_bg,
                     "skill_icon": self.skill_icon,
@@ -120,9 +120,9 @@ class HPPodcraftSkill(OVOSCommonPlaybackSkill):
                 continue
             results.append(merge_dict(v, {
                 "match_confidence": score,
-                "media_type": CPSMatchType.AUDIOBOOK,
+                "media_type": CommonPlayMediaType.AUDIOBOOK,
                 "uri": v["stream"],
-                "playback": CPSPlayback.AUDIO,
+                "playback": CommonPlayPlaybackType.AUDIO,
                 "image": self.default_image,
                 "bg_image": self.default_bg,
                 "skill_icon": self.skill_icon,
