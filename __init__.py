@@ -79,7 +79,6 @@ class HPPodcraftSkill(OVOSCommonPlaybackSkill):
         num = extract_number(phrase, ordinals=True) or len(self.episodes)
         phrase = self.clean_vocs(phrase)
 
-        results = []
         reading_base = episode_base = base_score
         if media_type == CommonPlayMediaType.AUDIOBOOK:
             reading_base += 10
@@ -88,37 +87,11 @@ class HPPodcraftSkill(OVOSCommonPlaybackSkill):
             episode_base += 10
             reading_base -= 5
 
-        if media_type != CommonPlayMediaType.GENERIC:
-            i = len(self.episodes)
-            for k, v in self.episodes.items():
-                score = fuzzy_match(phrase, k) * 100
-                score += episode_base
-                if i == num:
-                    score += 15
-                if str(num) in k.split(" "):
-                    score += 10
-                if str(num) in k:
-                    score += 5
-
-                results.append(merge_dict(v, {
-                    "match_confidence": score,
-                    "media_type": CommonPlayMediaType.PODCAST,
-                    "uri": v["stream"],
-                    "playback": CommonPlayPlaybackType.AUDIO,
-                    "image": self.default_image,
-                    "bg_image": self.default_bg,
-                    "skill_icon": self.skill_icon,
-                    "skill_logo": self.skill_logo,
-                    "author": "HPPodcraft",
-                    "album": "HPPodcraft"
-                }))
-                i -= 1
-
         for k, v in self.readings.items():
             score = reading_base + fuzzy_match(phrase, k) * 100
-            if score < 45:
-                continue
-            results.append(merge_dict(v, {
+            if media_type != CommonPlayMediaType.AUDIOBOOK:
+                score -= 15
+            yield merge_dict(v, {
                 "match_confidence": score,
                 "media_type": CommonPlayMediaType.AUDIOBOOK,
                 "uri": v["stream"],
@@ -129,9 +102,36 @@ class HPPodcraftSkill(OVOSCommonPlaybackSkill):
                 "skill_logo": self.skill_logo,
                 "author": "HPPodcraft",
                 "album": "HPPodcraft"
-            }))
+            })
 
-        return results
+        if media_type != CommonPlayMediaType.GENERIC or \
+                media_type == CommonPlayMediaType.PODCAST:
+            i = len(self.episodes)
+            for k, v in self.episodes.items():
+                score = fuzzy_match(phrase, k) * 100
+                score += episode_base
+                if media_type != CommonPlayMediaType.PODCAST:
+                    score -= 20
+                if i == num:
+                    score += 15
+                if str(num) in k.split(" "):
+                    score += 10
+                if str(num) in k:
+                    score += 5
+
+                yield merge_dict(v, {
+                    "match_confidence": score,
+                    "media_type": CommonPlayMediaType.PODCAST,
+                    "uri": v["stream"],
+                    "playback": CommonPlayPlaybackType.AUDIO,
+                    "image": self.default_image,
+                    "bg_image": self.default_bg,
+                    "skill_icon": self.skill_icon,
+                    "skill_logo": self.skill_logo,
+                    "author": "HPPodcraft",
+                    "album": "HPPodcraft"
+                })
+                i -= 1
 
     # hppodcraft
     def get_streams(self):

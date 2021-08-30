@@ -1,3 +1,2 @@
 feedparser
-ovos_utils>=0.0.12a2
-ovos_workshop>=0.0.4a1
+ovos_workshop>=0.0.4a13
