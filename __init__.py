@@ -1,8 +1,8 @@
 from lingua_franca.parse import extract_number
 import feedparser
 from ovos_workshop.skills.common_play import OVOSCommonPlaybackSkill
-from ovos_workshop.frameworks.playback import CommonPlayMediaType, CommonPlayPlaybackType, \
-    CommonPlayMatchConfidence
+from ovos_plugin_common_play.ocp import MediaType, PlaybackType, \
+    MatchConfidence
 from os.path import join, dirname
 from mycroft.util.parse import fuzzy_match
 from ovos_utils.json_helper import merge_dict
@@ -12,9 +12,9 @@ class HPPodcraftSkill(OVOSCommonPlaybackSkill):
 
     def __init__(self):
         super().__init__("HPPodcraft")
-        self.supported_media = [CommonPlayMediaType.GENERIC,
-                                CommonPlayMediaType.AUDIOBOOK,
-                                CommonPlayMediaType.PODCAST]
+        self.supported_media = [MediaType.GENERIC,
+                                MediaType.AUDIOBOOK,
+                                MediaType.PODCAST]
         # TODO from websettings meta
         if "auth" not in self.settings:
             self.settings["auth"] = "mvbfxt71cwu0zkdwz7h5lx8et8m_bjm0"
@@ -45,15 +45,15 @@ class HPPodcraftSkill(OVOSCommonPlaybackSkill):
 
         Arguments:
             phrase (str): User phrase uttered after "Play", e.g. "some music"
-            media_type (CommonPlayMediaType): requested CPSMatchType to search for
+            media_type (MediaType): requested CPSMatchType to media for
 
         Returns:
             search_results (list): list of dictionaries with result entries
             {
-                "match_confidence": CommonPlayMatchConfidence.HIGH,
+                "match_confidence": MatchConfidence.HIGH,
                 "media_type":  CPSMatchType.MUSIC,
                 "uri": "https://audioservice.or.gui.will.play.this",
-                "playback": CommonPlayPlaybackType.VIDEO,
+                "playback": PlaybackType.VIDEO,
                 "image": "http://optional.audioservice.jpg",
                 "bg_image": "http://optional.audioservice.background.jpg"
             }
@@ -66,7 +66,7 @@ class HPPodcraftSkill(OVOSCommonPlaybackSkill):
 
         if self.voc_match(phrase, "hppodcraft"):
             base_score += 50
-        elif media_type == CommonPlayMediaType.GENERIC:
+        elif media_type == MediaType.GENERIC:
             base_score = 0
 
         if self.voc_match(phrase, "lovecraft"):
@@ -80,22 +80,22 @@ class HPPodcraftSkill(OVOSCommonPlaybackSkill):
         phrase = self.clean_vocs(phrase)
 
         reading_base = episode_base = base_score
-        if media_type == CommonPlayMediaType.AUDIOBOOK:
+        if media_type == MediaType.AUDIOBOOK:
             reading_base += 10
             episode_base -= 10
-        elif media_type == CommonPlayMediaType.PODCAST:
+        elif media_type == MediaType.PODCAST:
             episode_base += 10
             reading_base -= 5
 
         for k, v in self.readings.items():
             score = reading_base + fuzzy_match(phrase, k) * 100
-            if media_type != CommonPlayMediaType.AUDIOBOOK:
+            if media_type != MediaType.AUDIOBOOK:
                 score -= 15
             yield merge_dict(v, {
                 "match_confidence": score,
-                "media_type": CommonPlayMediaType.AUDIOBOOK,
+                "media_type": MediaType.AUDIOBOOK,
                 "uri": v["stream"],
-                "playback": CommonPlayPlaybackType.AUDIO,
+                "playback": PlaybackType.AUDIO,
                 "image": self.default_image,
                 "bg_image": self.default_bg,
                 "skill_icon": self.skill_icon,
@@ -104,13 +104,13 @@ class HPPodcraftSkill(OVOSCommonPlaybackSkill):
                 "album": "HPPodcraft"
             })
 
-        if media_type != CommonPlayMediaType.GENERIC or \
-                media_type == CommonPlayMediaType.PODCAST:
+        if media_type != MediaType.GENERIC or \
+                media_type == MediaType.PODCAST:
             i = len(self.episodes)
             for k, v in self.episodes.items():
                 score = fuzzy_match(phrase, k) * 100
                 score += episode_base
-                if media_type != CommonPlayMediaType.PODCAST:
+                if media_type != MediaType.PODCAST:
                     score -= 20
                 if i == num:
                     score += 15
@@ -121,9 +121,9 @@ class HPPodcraftSkill(OVOSCommonPlaybackSkill):
 
                 yield merge_dict(v, {
                     "match_confidence": score,
-                    "media_type": CommonPlayMediaType.PODCAST,
+                    "media_type": MediaType.PODCAST,
                     "uri": v["stream"],
-                    "playback": CommonPlayPlaybackType.AUDIO,
+                    "playback": PlaybackType.AUDIO,
                     "image": self.default_image,
                     "bg_image": self.default_bg,
                     "skill_icon": self.skill_icon,
