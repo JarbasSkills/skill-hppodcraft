@@ -1,11 +1,12 @@
-from lingua_franca.parse import extract_number
-import feedparser
-from ovos_workshop.skills.common_play import OVOSCommonPlaybackSkill
-from ovos_plugin_common_play.ocp import MediaType, PlaybackType, \
-    MatchConfidence
 from os.path import join, dirname
+
+import feedparser
+from lingua_franca.parse import extract_number
 from mycroft.util.parse import fuzzy_match
 from ovos_utils.json_helper import merge_dict
+from ovos_workshop.skills.common_play import OVOSCommonPlaybackSkill, \
+    MediaType, PlaybackType, \
+    ocp_search
 
 
 class HPPodcraftSkill(OVOSCommonPlaybackSkill):
@@ -40,7 +41,8 @@ class HPPodcraftSkill(OVOSCommonPlaybackSkill):
         return phrase
 
     # common play
-    def CPS_search(self, phrase, media_type):
+    @ocp_search()
+    def search(self, phrase, media_type):
         """Analyze phrase to see if it is a play-able phrase with this skill.
 
         Arguments:
@@ -155,7 +157,7 @@ class HPPodcraftSkill(OVOSCommonPlaybackSkill):
                     stream = url["href"]
                     break
             entry = {
-                #"summary": bs4.BeautifulSoup(e["summary"], "html.parser").text,
+                # "summary": bs4.BeautifulSoup(e["summary"], "html.parser").text,
                 "summary": e["summary"],
                 "title": e["title"],
                 "stream": stream,
