@@ -6,9 +6,7 @@ Listen to the podcasts or selected readings
 
 ![](./ui/logo.png)
 
-## About 
-
-
+## About
 
 Each week, hosts Chad Fifer and Chris Lackey discuss a piece of weird fiction.
 Talented voice actors bring the text to life. 
@@ -35,7 +33,6 @@ Full story readings are also available alongside podcasts
 ## Examples 
 
 * "play lovecraft podcast"
-* "play lovecraft podcast episode #N"
 * "play the temple by lovecraft"
 * "read the call of cthulhu"
 
