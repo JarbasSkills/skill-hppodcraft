@@ -3,7 +3,7 @@ from os.path import join, dirname
 import feedparser
 from mycroft.util.parse import fuzzy_match
 from ovos_workshop.skills.common_play import OVOSCommonPlaybackSkill, \
-    MediaType, PlaybackType, ocp_search
+    MediaType, PlaybackType, ocp_search, ocp_featured_media
 
 
 class HPPodcraftSkill(OVOSCommonPlaybackSkill):
@@ -115,6 +115,34 @@ class HPPodcraftSkill(OVOSCommonPlaybackSkill):
             "title": "HPPodcraft (Audiobook Readings)",
             "author": "H. P. Lovecraft"
         }]
+
+    @ocp_featured_media()
+    def featured_media(self):
+        pl = [{
+            "media_type": MediaType.AUDIOBOOK,
+            "uri": v["stream"],
+            "title": k,
+            "playback": PlaybackType.AUDIO,
+            "image": self.default_image,
+            "bg_image": self.default_bg,
+            "skill_icon": self.skill_icon,
+            "author": "HPPodcraft",
+            "album": "HPPodcraft"
+        } for k, v in self.readings.items()]
+
+        pl += [{
+            "media_type": MediaType.PODCAST,
+            "uri": v["stream"],
+            "title": k,
+            "playback": PlaybackType.AUDIO,
+            "image": self.default_image,
+            "bg_image": self.default_bg,
+            "skill_icon": self.skill_icon,
+            "author": "HPPodcraft",
+            "album": "HPPodcraft"
+        } for k, v in self.episodes.items()]
+
+        return pl
 
     # hppodcraft
     def get_streams(self):
