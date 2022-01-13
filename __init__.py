@@ -162,7 +162,7 @@ class HPPodcraftSkill(OVOSCommonPlaybackSkill):
         for e in data.entries:
             stream = None
             for url in e["links"]:
-                if url["type"] == 'audio_only/mpeg':
+                if "audio" in url["type"]:
                     stream = url["href"]
                     break
             entry = {
