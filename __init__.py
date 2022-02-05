@@ -13,16 +13,17 @@ class HPPodcraftSkill(OVOSCommonPlaybackSkill):
         self.supported_media = [MediaType.GENERIC,
                                 MediaType.AUDIOBOOK,
                                 MediaType.PODCAST]
-        # TODO from websettings meta
-        if "auth" not in self.settings:
-            self.settings["auth"] = "mvbfxt71cwu0zkdwz7h5lx8et8m_bjm0"
-
         self.default_image = join(dirname(__file__), "ui", "bg2.jpg")
         self.skill_icon = join(dirname(__file__), "ui", "logo.png")
         self.default_bg = join(dirname(__file__), "ui", "bg2.jpg")
         data = self.get_streams()
         self.readings = data["readings"]
         self.episodes = data["episodes"]
+
+    def initialize(self):
+        # TODO from websettings meta
+        if "auth" not in self.settings:
+            self.settings["auth"] = "mvbfxt71cwu0zkdwz7h5lx8et8m_bjm0"
 
     def clean_vocs(self, phrase):
         phrase = self.remove_voc(phrase, "reading")
