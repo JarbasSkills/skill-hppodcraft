@@ -7,19 +7,20 @@ from ovos_workshop.skills.common_play import OVOSCommonPlaybackSkill, \
 
 
 class HPPodcraftSkill(OVOSCommonPlaybackSkill):
-
-    def __init__(self):
-        super().__init__("HPPodcraft")
-        self.supported_media = [MediaType.GENERIC,
-                                MediaType.AUDIOBOOK,
+    def __init__(self, *args, **kwargs):
+        self.supported_media = [MediaType.AUDIOBOOK,
                                 MediaType.PODCAST]
-        # TODO from websettings meta
-        if "auth" not in self.settings:
-            self.settings["auth"] = "mvbfxt71cwu0zkdwz7h5lx8et8m_bjm0"
 
         self.default_image = join(dirname(__file__), "ui", "bg2.jpg")
         self.skill_icon = join(dirname(__file__), "ui", "logo.png")
         self.default_bg = join(dirname(__file__), "ui", "bg2.jpg")
+        super().__init__(*args, **kwargs)
+
+    def initialize(self):
+        # TODO from websettings meta
+        if "auth" not in self.settings:
+            self.settings["auth"] = "mvbfxt71cwu0zkdwz7h5lx8et8m_bjm0"
+
         data = self.get_streams()
         self.readings = data["readings"]
         self.episodes = data["episodes"]
@@ -86,10 +87,11 @@ class HPPodcraftSkill(OVOSCommonPlaybackSkill):
 
     @ocp_search()
     def ocp_hppodcraft_readings_playlist(self, phrase, media_type):
-        score = self.get_base_score(phrase, media_type)
 
         if media_type == MediaType.PODCAST:
             return
+
+        score = self.get_base_score(phrase, media_type)
 
         pl = [{
             "match_confidence": fuzzy_match(phrase, k) * 100,
@@ -118,6 +120,7 @@ class HPPodcraftSkill(OVOSCommonPlaybackSkill):
 
     # hppodcraft
     def get_streams(self):
+
         url = "https://www.patreon.com/rss/witchhousemmedia?auth=" + \
               self.settings["auth"]
 
@@ -152,6 +155,7 @@ class HPPodcraftSkill(OVOSCommonPlaybackSkill):
                 if "-" in norm:
                     norm = "-".join(norm.split("-")[1:]).strip()
                 readings[norm] = entry
+
             elif e["title"].startswith("Comments Show"):
                 comments_show[e["title"]] = entry
             elif e["title"].startswith("Bonus"):
@@ -167,12 +171,17 @@ class HPPodcraftSkill(OVOSCommonPlaybackSkill):
             else:
                 other[e["title"]] = entry
 
+        self.register_ocp_keyword(MediaType.AUDIOBOOK,
+                                  "book_name", list(readings))
+        self.register_ocp_keyword(MediaType.PODCAST,
+                                  "podcast_name", ["HPPodcraft"])
+        self.register_ocp_keyword(MediaType.PODCAST,
+                                  "podcast_streaming_provider",
+                                  ["HPPodcraft", "HP Podcraft", "H. P. Podcraft"])
+
         return {"readings": readings,
                 "episodes": episodes,
                 "originals": originals,
                 "commercials": commercial, "comments_show": comments_show,
                 "bonus": bonus, "other": other}
 
-
-def create_skill():
-    return HPPodcraftSkill()
