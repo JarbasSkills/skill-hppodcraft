@@ -1,9 +1,11 @@
 from os.path import join, dirname
 
 import feedparser
-from mycroft.util.parse import fuzzy_match
-from ovos_workshop.skills.common_play import OVOSCommonPlaybackSkill, \
-    MediaType, PlaybackType, ocp_search
+from ovos_utils import timed_lru_cache
+from ovos_utils.ocp import PlaybackType, MediaType
+
+from ovos_workshop.decorators.ocp import ocp_search, ocp_featured_media
+from ovos_workshop.skills.common_play import OVOSCommonPlaybackSkill
 
 
 class HPPodcraftSkill(OVOSCommonPlaybackSkill):
@@ -20,105 +22,159 @@ class HPPodcraftSkill(OVOSCommonPlaybackSkill):
         # TODO from websettings meta
         if "auth" not in self.settings:
             self.settings["auth"] = "mvbfxt71cwu0zkdwz7h5lx8et8m_bjm0"
+        self.get_streams()  # trigger keyword registering / pre-cache
 
-        data = self.get_streams()
-        self.readings = data["readings"]
-        self.episodes = data["episodes"]
+    @property
+    def readings(self):
+        return self.get_streams()["readings"]
 
-    def clean_vocs(self, phrase):
-        phrase = self.remove_voc(phrase, "reading")
-        phrase = self.remove_voc(phrase, "episode")
-        phrase = self.remove_voc(phrase, "lovecraft")
-        phrase = self.remove_voc(phrase, "hppodcraft")
-        phrase = phrase.strip()
-        return phrase
+    @property
+    def episodes(self):
+        return self.get_streams()["episodes"]
 
-    # common play
-    def get_base_score(self, phrase, media_type):
-        base_score = 0
-        if self.voc_match(phrase, "episode") or \
-                self.voc_match(phrase, "reading"):
-            base_score += 10
-        if self.voc_match(phrase, "hppodcraft"):
-            base_score += 50
-        elif media_type == MediaType.GENERIC:
-            base_score = 0
-        if self.voc_match(phrase, "lovecraft"):
-            base_score += 30
-        return base_score
+    def ocp_hppodcraft_playlist(self, media_type, score=100):
+        score = min(100, score)
+        if media_type == MediaType.AUDIOBOOK:
+            pl = [{
+                "match_confidence": score,
+                "media_type": MediaType.AUDIOBOOK,
+                "uri": v["stream"],
+                "title": k,
+                "playback": PlaybackType.AUDIO,
+                "image": self.default_image,
+                "bg_image": self.default_bg,
+                "skill_icon": self.skill_icon,
+                "author": "HPPodcraft",
+                "album": "HPPodcraft"
+            } for k, v in self.readings.items()]
 
-    @ocp_search()
-    def ocp_hppodcraft_playlist(self, phrase, media_type):
-        score = self.get_base_score(phrase, media_type)
-        if self.voc_match(phrase, "lovecraft"):
-            score += 10
-        if media_type == MediaType.PODCAST or \
-                self.voc_match(phrase, "podcast"):
-            score += 10
-        elif media_type == MediaType.AUDIOBOOK:
-            return
+            yield {
+                "match_confidence": score,
+                "media_type": MediaType.AUDIOBOOK,
+                "playlist": pl,
+                "playback": PlaybackType.AUDIO,
+                "skill_icon": self.skill_icon,
+                "image": self.default_bg,
+                "bg_image": self.default_bg,
+                "title": "HPPodcraft (Audiobook Readings)",
+                "author": "H. P. Lovecraft"
+            }
         else:
-            score -= 15
+            pl = [{
+                "match_confidence": score,
+                "media_type": MediaType.PODCAST,
+                "uri": v["stream"],
+                "title": k,
+                "playback": PlaybackType.AUDIO,
+                "image": self.default_image,
+                "bg_image": self.default_bg,
+                "skill_icon": self.skill_icon,
+                "author": "HPPodcraft",
+                "album": "HPPodcraft"
+            } for k, v in self.episodes.items()]
 
-        pl = [{
-            "match_confidence": fuzzy_match(phrase, k) * 100,
-            "media_type": MediaType.PODCAST,
-            "uri": v["stream"],
-            "title": k,
-            "playback": PlaybackType.AUDIO,
-            "image": self.default_image,
-            "bg_image": self.default_bg,
-            "skill_icon": self.skill_icon,
-            "author": "HPPodcraft",
-            "album": "HPPodcraft"
-        } for k, v in self.episodes.items()]
+            yield {
+                "match_confidence": score,
+                "media_type": MediaType.PODCAST,
+                "playlist": pl,
+                "playback": PlaybackType.AUDIO,
+                "skill_icon": self.skill_icon,
+                "image": self.default_bg,
+                "bg_image": self.default_bg,
+                "title": "HPPodcraft (Podcast)",
+                "author": "H. P. Lovecraft"
+            }
 
-        return [{
-            "match_confidence": score,
-            "media_type": MediaType.PODCAST,
-            "playlist": pl,
-            "playback": PlaybackType.AUDIO,
-            "skill_icon": self.skill_icon,
-            "image": self.default_bg,
-            "bg_image": self.default_bg,
-            "title": "HPPodcraft (Podcast)",
-            "author": "H. P. Lovecraft"
-        }]
+    @ocp_featured_media()
+    def featured_media(self):
+        return [
+            {
+                "match_confidence": 100,
+                "media_type": MediaType.PODCAST,
+                "uri": v["stream"],
+                "title": k,
+                "playback": PlaybackType.AUDIO,
+                "image": self.default_image,
+                "bg_image": self.default_bg,
+                "skill_icon": self.skill_icon,
+                "author": "HPPodcraft",
+                "album": "HPPodcraft"
+            } for k, v in self.episodes.items()] + [
+            {
+                "match_confidence": 100,
+                "media_type": MediaType.AUDIOBOOK,
+                "uri": v["stream"],
+                "title": k,
+                "playback": PlaybackType.AUDIO,
+                "image": self.default_image,
+                "bg_image": self.default_bg,
+                "skill_icon": self.skill_icon,
+                "author": "HPPodcraft",
+                "album": "HPPodcraft"
+            } for k, v in self.readings.items()]
 
     @ocp_search()
-    def ocp_hppodcraft_readings_playlist(self, phrase, media_type):
+    def search_db(self, phrase, media_type=MediaType.GENERIC):
+        base_score = 10 if media_type == MediaType.PODCAST else 0
+        entities = self.ocp_voc_match(phrase)
+        base_score += 20 * len(entities)
 
-        if media_type == MediaType.PODCAST:
-            return
+        title = entities.get("podcast_episode")
+        book = entities.get("book_name")
+        n = int(entities.get("episode_number", 0))
+        skill = "podcast_streaming_provider" in entities  # skill matched
 
-        score = self.get_base_score(phrase, media_type)
+        if skill:
+            base_score += 25
+            yield self.ocp_hppodcraft_playlist(media_type, base_score)
 
-        pl = [{
-            "match_confidence": fuzzy_match(phrase, k) * 100,
-            "media_type": MediaType.AUDIOBOOK,
-            "uri": v["stream"],
-            "title": k,
-            "playback": PlaybackType.AUDIO,
-            "image": self.default_image,
-            "bg_image": self.default_bg,
-            "skill_icon": self.skill_icon,
-            "author": "HPPodcraft",
-            "album": "HPPodcraft"
-        } for k, v in self.readings.items()]
-        pl = sorted(pl, key=lambda k: k["title"])
-        return [{
-            "match_confidence": score,
-            "media_type": MediaType.AUDIOBOOK,
-            "playlist": pl,
-            "playback": PlaybackType.AUDIO,
-            "skill_icon": self.skill_icon,
-            "image": self.default_bg,
-            "bg_image": self.default_bg,
-            "title": "HPPodcraft (Audiobook Readings)",
-            "author": "H. P. Lovecraft"
-        }]
+        # only search db if user explicitly requested a known episode / book name
+        if book and (media_type == MediaType.AUDIOBOOK or
+                     media_type == MediaType.GENERIC or
+                     skill):
+            for k, v in self.readings.items():
+                if book.lower() in k.lower():
+                    yield {
+                        "match_confidence": min(100,
+                                                base_score + 35 if media_type == MediaType.AUDIOBOOK
+                                                else base_score + 15),
+                        "media_type": MediaType.AUDIOBOOK,
+                        "uri": v["stream"],
+                        "title": k,
+                        "playback": PlaybackType.AUDIO,
+                        "image": self.default_image,
+                        "bg_image": self.default_bg,
+                        "skill_icon": self.skill_icon,
+                        "author": "HPPodcraft",
+                        "album": "HPPodcraft"
+                    }
+
+        if title and (media_type == MediaType.PODCAST or
+                      media_type == MediaType.GENERIC or
+                      skill):
+            if n:
+                base_score += 15
+            for k, v in self.episodes.items():
+                if n and str(n) not in k:
+                    continue
+                if title.lower() in k.lower():
+                    yield {
+                        "match_confidence": min(100,
+                                                base_score + 35 if media_type == MediaType.PODCAST else
+                                                base_score + 15),
+                        "media_type": MediaType.PODCAST,
+                        "uri": v["stream"],
+                        "title": k,
+                        "playback": PlaybackType.AUDIO,
+                        "image": self.default_image,
+                        "bg_image": self.default_bg,
+                        "skill_icon": self.skill_icon,
+                        "author": "HPPodcraft",
+                        "album": "HPPodcraft"
+                    }
 
     # hppodcraft
+    @timed_lru_cache(seconds=3600)
     def get_streams(self):
 
         url = "https://www.patreon.com/rss/witchhousemmedia?auth=" + \
@@ -137,7 +193,7 @@ class HPPodcraftSkill(OVOSCommonPlaybackSkill):
         for e in data.entries:
             stream = None
             for url in e["links"]:
-                if url["type"] == 'audio_only/mpeg':
+                if "audio" in url["type"]:
                     stream = url["href"]
                     break
             entry = {
@@ -149,13 +205,10 @@ class HPPodcraftSkill(OVOSCommonPlaybackSkill):
             }
 
             if e["title"].startswith("Episode"):
-                episodes[e["title"]] = entry
+                episodes[e["title"].replace('–', "-")] = entry
             elif e["title"].startswith("Reading"):
-                norm = e["title"].split("–")[-1].strip()
-                if "-" in norm:
-                    norm = "-".join(norm.split("-")[1:]).strip()
+                norm = e["title"].replace('–', "-").split("-")[1].strip()
                 readings[norm] = entry
-
             elif e["title"].startswith("Comments Show"):
                 comments_show[e["title"]] = entry
             elif e["title"].startswith("Bonus"):
@@ -176,12 +229,28 @@ class HPPodcraftSkill(OVOSCommonPlaybackSkill):
         self.register_ocp_keyword(MediaType.PODCAST,
                                   "podcast_name", ["HPPodcraft"])
         self.register_ocp_keyword(MediaType.PODCAST,
+                                  "podcast_episode", [e.split("-")[1].strip() for e in episodes if "-" in e])
+        self.register_ocp_keyword(MediaType.PODCAST,
+                                  "episode_number",
+                                  [e.split("-")[0].split("Episode")[-1].strip("! ") for e in episodes if
+                                   "Episode" in e])
+        self.register_ocp_keyword(MediaType.PODCAST,
                                   "podcast_streaming_provider",
                                   ["HPPodcraft", "HP Podcraft", "H. P. Podcraft"])
-
+        # self.export_ocp_keywords_csv("hppodcraft.csv")
         return {"readings": readings,
                 "episodes": episodes,
                 "originals": originals,
                 "commercials": commercial, "comments_show": comments_show,
                 "bonus": bonus, "other": other}
 
+
+if __name__ == "__main__":
+    from ovos_utils.messagebus import FakeBus
+
+    s = HPPodcraftSkill(bus=FakeBus(), skill_id="t.fake")
+
+    for r in s.search_db("cool air"):
+        print(r)
+        # {'match_confidence': 55, 'media_type': <MediaType.AUDIOBOOK: 4>, 'uri': 'https://c10.patreonusercontent.com/4/patreon-media/p/post/18594042/24cb07902ba647de8dc9fac2c8bfa13b/eyJhIjoxLCJwIjoxfQ%3D%3D/1.mp3?token-time=1706313600&token-hash=0EUi-VOVb9EO41YZy7LiNla8rc6xidlUrGS-7ZktnvA%3D', 'title': 'Cool Air', 'playback': <PlaybackType.AUDIO: 2>, 'image': '/home/miro/PycharmProjects/OCP_sprint/skills/skill-hppodcraft/ui/bg2.jpg', 'bg_image': '/home/miro/PycharmProjects/OCP_sprint/skills/skill-hppodcraft/ui/bg2.jpg', 'skill_icon': 'https://github.com/OpenVoiceOS/ovos-ocp-audio-plugin/raw/master/ovos_plugin_common_play/ocp/res/ui/images/ocp.png', 'author': 'HPPodcraft', 'album': 'HPPodcraft'}
+        # {'match_confidence': 55, 'media_type': <MediaType.PODCAST: 6>, 'uri': 'https://c10.patreonusercontent.com/4/patreon-media/p/post/18593309/328a2202e258488d9d5e01bb2fcc4a81/eyJhIjoxLCJwIjoxfQ%3D%3D/1.mp3?token-time=1706313600&token-hash=uqTS0ab-DM1XE6D34CsO1fl9bj6-DAGryn21nKWcIGM%3D', 'title': 'Episode 41 - Cool Air', 'playback': <PlaybackType.AUDIO: 2>, 'image': '/home/miro/PycharmProjects/OCP_sprint/skills/skill-hppodcraft/ui/bg2.jpg', 'bg_image': '/home/miro/PycharmProjects/OCP_sprint/skills/skill-hppodcraft/ui/bg2.jpg', 'skill_icon': 'https://github.com/OpenVoiceOS/ovos-ocp-audio-plugin/raw/master/ovos_plugin_common_play/ocp/res/ui/images/ocp.png', 'author': 'HPPodcraft', 'album': 'HPPodcraft'}
